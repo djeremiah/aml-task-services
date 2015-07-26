@@ -3,8 +3,10 @@ package com.example.bpms.rest;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -50,14 +52,13 @@ public class TaskService {
 		TypedQuery<BAMTaskSummaryImpl> query = em.createQuery("FROM BAMTaskSummaryImpl", BAMTaskSummaryImpl.class);
 		List<BAMTaskSummaryImpl> bamTasks = query.getResultList();
 		
-		List<String> gids = new ArrayList<>();
 		Predicate<BAMTaskSummaryImpl> myTasks = (t -> Objects.equals(uid, t.getUserId()));
 		Predicate<BAMTaskSummaryImpl> totalCompleted = (t -> Status.Completed.toString().equals(t.getStatus()));
 		
 		return new DashboardSummary(
-				0, 
+				bamTasks.size(), 
 				bamTasks.stream().filter(myTasks).count(), 
-				factory.newRuntimeEngine().getTaskService().getTasksAssignedAsPotentialOwner(uid, null).stream().map(ts ->  ts.getExpirationTime()).filter(d -> d == null || LocalTime.now().plusHours(48).isAfter(LocalDateTime.ofInstant(d.toInstant(), null).toLocalTime())).count(), 
+				factory.newRuntimeEngine().getTaskService().getTasksAssignedAsPotentialOwner(uid, null).stream().map(ts ->  ts.getExpirationTime()).filter(d -> d == null || LocalDate.now().plusDays(2).isAfter(d.toInstant().atZone(ZoneId.systemDefault()).toLocalDate())).count(), 
 				bamTasks.stream().filter(totalCompleted).count(), 
 				"NEVER");
 	}
