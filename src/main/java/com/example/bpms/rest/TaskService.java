@@ -2,23 +2,34 @@ package com.example.bpms.rest;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Arrays;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Predicate;
 
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.TypedQuery;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 
+import org.jbpm.services.task.audit.impl.model.BAMTaskSummaryImpl;
 import org.kie.api.task.model.Status;
 import org.kie.api.task.model.TaskSummary;
 import org.kie.remote.client.api.RemoteRestRuntimeEngineFactory;
 import org.kie.remote.client.api.RemoteRuntimeEngineFactory;
 import org.kie.remote.client.api.exception.InsufficientInfoToBuildException;
-import org.kie.services.client.api.command.RemoteRuntimeEngine;
 
 @Path("/task-service")
 public class TaskService {
+	
+	@PersistenceContext
+	EntityManager em;
 
 	private final RemoteRestRuntimeEngineFactory factory;
 
@@ -36,17 +47,22 @@ public class TaskService {
 	@Path("/{uid}/summary")
 	@Produces("application/json")
 	public DashboardSummary getSummary(@PathParam("uid") final String uid) {
-		RemoteRuntimeEngine runtimeEngine = factory.newRuntimeEngine();
-		org.kie.api.task.TaskService taskService = runtimeEngine.getTaskService();
-		List<TaskSummary> tasks = taskService.getTasksAssignedAsPotentialOwnerByStatus(uid, Arrays.asList(Status.values()), null);
+		TypedQuery<BAMTaskSummaryImpl> query = em.createQuery("FROM BAMTaskSummaryImpl", BAMTaskSummaryImpl.class);
+		List<BAMTaskSummaryImpl> bamTasks = query.getResultList();
+		
+		List<String> gids = new ArrayList<>();
+		Predicate<BAMTaskSummaryImpl> myTasks = (t -> Objects.equals(uid, t.getUserId()));
+		Predicate<BAMTaskSummaryImpl> totalCompleted = (t -> Status.Completed.toString().equals(t.getStatus()));
 		
 		return new DashboardSummary(
-				tasks.size(), 
 				0, 
-				0, 
-				tasks.stream().filter(t -> Status.Completed.equals(t.getStatus())).count(), 
+				bamTasks.stream().filter(myTasks).count(), 
+				factory.newRuntimeEngine().getTaskService().getTasksAssignedAsPotentialOwner(uid, null).stream().map(ts ->  ts.getExpirationTime()).filter(d -> d == null || LocalTime.now().plusHours(48).isAfter(LocalDateTime.ofInstant(d.toInstant(), null).toLocalTime())).count(), 
+				bamTasks.stream().filter(totalCompleted).count(), 
 				"NEVER");
 	}
+	
+	
 
 	@GET
 	@Path("/{uid}/tasklist")
@@ -58,10 +74,10 @@ public class TaskService {
 	
 
 	public class DashboardSummary {
-		private long totalTasks;
-		private long myTasks;
-		private long urgentTasks;
-		private long totalCompleted;
+		private long totalTasks; // total tasks for user and group
+		private long myTasks; // total tasks for user
+		private long urgentTasks; // tasks due today
+		private long totalCompleted; // total tasks completed by user
 		private String avgTimeToCompletion;
 
 		public DashboardSummary() {
