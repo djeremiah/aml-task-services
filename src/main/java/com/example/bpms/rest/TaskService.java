@@ -144,7 +144,7 @@ public class TaskService {
 		}
 
 		Duration compute() {
-			return runningSum.dividedBy(count);
+			return count != 0 ? runningSum.dividedBy(count) : Duration.ZERO;
 		}
 	}
 
