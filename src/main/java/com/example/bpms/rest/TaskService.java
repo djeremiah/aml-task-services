@@ -43,6 +43,14 @@ public class TaskService {
 				.addUserName("bpmsAdmin").addPassword("jbossadmin1!")
 				.buildFactory();
 	}
+	
+	@GET
+	@Path("/{uid}/tasklist")
+	@Produces("application/json")
+	public List<TaskSummary> getTasksForUser(@PathParam("uid") final String uid) {
+		return factory.newRuntimeEngine().getTaskService()
+				.getTasksAssignedAsPotentialOwner(uid, null);
+	}
 
 	@GET
 	@Path("/{uid}/summary")
@@ -54,8 +62,10 @@ public class TaskService {
 		List<TaskSummary> runtimeTasks = factory.newRuntimeEngine()
 				.getTaskService().getTasksAssignedAsPotentialOwner(uid, null);
 
-		return new DashboardSummary(getTotalTasks(bamTasks), getMyTasks(
-				bamTasks, uid), getUrgentTasks(runtimeTasks),
+		return new DashboardSummary(
+				getTotalTasks(bamTasks), 
+				getMyTasks(bamTasks, uid), 
+				getUrgentTasks(runtimeTasks),
 				getTotalCompleted(bamTasks),
 				getAverageTimeToCompletion(bamTasks));
 	}
@@ -136,14 +146,6 @@ public class TaskService {
 		Duration compute() {
 			return runningSum.dividedBy(count);
 		}
-	}
-
-	@GET
-	@Path("/{uid}/tasklist")
-	@Produces("application/json")
-	public List<TaskSummary> getTasksForUser(@PathParam("uid") final String uid) {
-		return factory.newRuntimeEngine().getTaskService()
-				.getTasksAssignedAsPotentialOwner(uid, null);
 	}
 
 	public class DashboardSummary {
